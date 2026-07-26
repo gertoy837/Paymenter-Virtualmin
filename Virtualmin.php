@@ -149,8 +149,8 @@ class Virtualmin extends Server
         if (!empty($settings['plan'])) {
             $params['plan'] = $settings['plan'];
         } else {
-            $params['quota'] = $settings['quota'] ?? 1024;
-            $params['bandwidth'] = $settings['bandwidth'] ?? 10240;
+            $params['quota'] = !empty($settings['quota']) ? $settings['quota'] : 1024;
+            $params['bandwidth'] = !empty($settings['bandwidth']) ? $settings['bandwidth'] : 10240;
         }
 
         $features = $this->normalizeFeatures($settings['features'] ?? null);
@@ -229,8 +229,8 @@ class Virtualmin extends Server
         if (!empty($settings['plan'])) {
             $params['plan'] = $settings['plan'];
         } else {
-            $params['quota'] = $settings['quota'] ?? 1024;
-            $params['bandwidth'] = $settings['bandwidth'] ?? 10240;
+            $params['quota'] = !empty($settings['quota']) ? $settings['quota'] : 1024;
+            $params['bandwidth'] = !empty($settings['bandwidth']) ? $settings['bandwidth'] : 10240;
         }
 
         $response = $this->apiCall($params);
