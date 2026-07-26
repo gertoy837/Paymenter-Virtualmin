@@ -13,7 +13,7 @@ Provision, suspend, unsuspend, upgrade, and terminate Virtualmin virtual servers
 - **Manual:** Download the code and place it in the `app/extensions/Servers/Virtualmin` directory (or `extensions/Servers/Virtualmin` depending on your Paymenter version).
 - **Automatic:**
   ```bash
-  git clone https://github.com/yourusername/Paymenter-Virtualmin /var/www/paymenter/extensions/Servers/Virtualmin
+  git clone https://github.com/gertoy837/Paymenter-Virtualmin /var/www/paymenter/extensions/Servers/Virtualmin
   ```
 
 Then, from your Paymenter install directory:
