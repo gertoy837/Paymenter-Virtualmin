@@ -3,7 +3,7 @@
 namespace Paymenter\Extensions\Servers\Virtualmin;
 
 use App\Attributes\ExtensionMeta;
-use App\Classes\Extension\Extension;
+use App\Classes\Extension\Server;
 use App\Models\Service;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Log;
     url: 'https://www.virtualmin.com',
     icon: 'https://raw.githubusercontent.com/virtualmin/virtualmin-source/master/design/virtualmin-icon.png'
 )]
-class Virtualmin extends Extension
+class Virtualmin extends Server
 {
     /**
      * Global extension settings (per Virtualmin server).
@@ -158,7 +158,7 @@ class Virtualmin extends Extension
             $params[$feature] = 1;
         }
 
-        $response = $this->apiCall($settings, $params);
+        $response = $this->apiCall($params);
 
         if (($response['status'] ?? null) !== 'success') {
             throw new \Exception('Virtualmin: failed to create domain "' . $domain . '": ' . ($response['error'] ?? 'unknown error'));
@@ -179,7 +179,7 @@ class Virtualmin extends Extension
     {
         $domain = $properties['domain'] ?? null;
 
-        $response = $this->apiCall($settings, [
+        $response = $this->apiCall([
             'program' => 'disable-domain',
             'domain' => $domain,
             'json' => 1,
@@ -199,7 +199,7 @@ class Virtualmin extends Extension
     {
         $domain = $properties['domain'] ?? null;
 
-        $response = $this->apiCall($settings, [
+        $response = $this->apiCall([
             'program' => 'enable-domain',
             'domain' => $domain,
             'json' => 1,
@@ -232,7 +232,7 @@ class Virtualmin extends Extension
             $params['bandwidth'] = $settings['bandwidth'] ?? 10240;
         }
 
-        $response = $this->apiCall($settings, $params);
+        $response = $this->apiCall($params);
 
         if (($response['status'] ?? null) !== 'success') {
             throw new \Exception('Virtualmin: failed to upgrade domain "' . $domain . '": ' . ($response['error'] ?? 'unknown error'));
@@ -253,7 +253,7 @@ class Virtualmin extends Extension
             return true;
         }
 
-        $response = $this->apiCall($settings, [
+        $response = $this->apiCall([
             'program' => 'delete-domain',
             'domain' => $domain,
             'json' => 1,
@@ -290,7 +290,7 @@ class Virtualmin extends Extension
             [
                 'name' => 'control_panel',
                 'label' => 'Login to Virtualmin',
-                'url' => rtrim($settings['host'], '/') . ':' . ($settings['port'] ?? 10000),
+                'url' => $this->getPanelUrl(),
                 'type' => 'button',
             ],
         ];
@@ -326,6 +326,19 @@ class Virtualmin extends Extension
     }
 
     /**
+     * Build the panel login URL from the server config, without a redundant
+     * ":443" for setups (e.g. Cloudflare Tunnel) that already serve on 443.
+     */
+    protected function getPanelUrl(): string
+    {
+        $config = $this->config;
+        $host = rtrim($config['host'] ?? '', '/');
+        $port = $config['port'] ?? 10000;
+
+        return ((string) $port === '443') ? $host : $host . ':' . $port;
+    }
+
+    /**
      * Small helper to generate a valid, unique-ish unix username from a domain.
      */
     protected function generateUsername(string $domain): string
@@ -349,14 +362,22 @@ class Virtualmin extends Extension
      * Docs: https://webmin.com/docs/api/remote/ (Virtualmin uses the same
      * remote.cgi mechanism as Webmin, one parameter per create-domain.pl option).
      */
-    protected function apiCall($settings, array $params): array
+    protected function apiCall(array $params): array
     {
-        $url = rtrim($settings['host'], '/') . ':' . ($settings['port'] ?? 10000) . '/virtual-server/remote.cgi';
+        $config = $this->config;
+        $port = $config['port'] ?? 10000;
+        $host = rtrim($config['host'], '/');
+
+        // Don't append the port if it's already the standard HTTPS port,
+        // since some hosts (e.g. behind Cloudflare Tunnel) route via 443
+        // and the URL shouldn't have ":443" tacked on.
+        $url = ((string) $port === '443') ? $host : $host . ':' . $port;
+        $url .= '/virtual-server/remote.cgi';
 
         try {
-            $response = Http::withBasicAuth($settings['username'], $settings['password'])
+            $response = Http::withBasicAuth($config['username'], $config['password'])
                 ->withOptions([
-                    'verify' => (bool) ($settings['verify_ssl'] ?? true),
+                    'verify' => (bool) ($config['verify_ssl'] ?? true),
                 ])
                 ->timeout(30)
                 ->get($url, $params);
