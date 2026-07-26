@@ -410,7 +410,13 @@ class Virtualmin extends Server
                         CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
                     ],
                 ])
-                ->timeout(30)
+                // create-domain (and to a lesser extent modify-domain) can take
+                // well over 30 seconds server-side when SSL/mail/mysql/DNS are
+                // all enabled — Virtualmin still finishes the job even if this
+                // client gives up first, which just orphans a domain the panel
+                // never learns succeeded. A generous timeout avoids that.
+                ->connectTimeout(15)
+                ->timeout(120)
                 ->get($url);
         } catch (\Exception $e) {
             Log::error('Virtualmin API connection error: ' . $e->getMessage());
