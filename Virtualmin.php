@@ -153,7 +153,7 @@ class Virtualmin extends Extension
             $params['bandwidth'] = $settings['bandwidth'] ?? 10240;
         }
 
-        $features = $settings['features'] ?? ['web', 'dns', 'mail', 'mysql', 'ssl'];
+        $features = $this->normalizeFeatures($settings['features'] ?? null);
         foreach ($features as $feature) {
             $params[$feature] = 1;
         }
@@ -294,6 +294,35 @@ class Virtualmin extends Extension
                 'type' => 'button',
             ],
         ];
+    }
+
+    /**
+     * Paymenter can store multi-select product config values as a real PHP
+     * array, a JSON-encoded string, or a comma-separated string depending on
+     * version/DB layer — normalize all of those into a plain array here.
+     */
+    protected function normalizeFeatures($value): array
+    {
+        $default = ['web', 'dns', 'mail', 'mysql', 'ssl'];
+
+        if (empty($value)) {
+            return $default;
+        }
+
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+
+            return array_filter(array_map('trim', explode(',', $value)));
+        }
+
+        return $default;
     }
 
     /**
