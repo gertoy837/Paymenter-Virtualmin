@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 #[ExtensionMeta(
     name: 'Virtualmin',
     description: 'Provision, suspend and manage Virtualmin (GPL/Pro) virtual servers directly from Paymenter.',
-    version: '1.0.0',
+    version: '1.0.1',
     author: 'Custom',
     url: 'https://www.virtualmin.com',
     icon: 'https://raw.githubusercontent.com/virtualmin/virtualmin-source/master/design/virtualmin-icon.png'
@@ -149,7 +149,13 @@ class Virtualmin extends Server
         if (!empty($settings['plan'])) {
             $params['plan'] = $settings['plan'];
         } else {
-            $params['quota'] = !empty($settings['quota']) ? $settings['quota'] : 1024;
+            // Virtualmin's create-domain API requires BOTH quota (domain/group
+            // quota) and uquota (owning user's mail/home quota) to be sent
+            // together — sending only "quota" makes Virtualmin respond with
+            // "No quota specified" even though a quota value was provided.
+            $quota = !empty($settings['quota']) ? $settings['quota'] : 1024;
+            $params['quota'] = $quota;
+            $params['uquota'] = $quota;
             $params['bandwidth'] = !empty($settings['bandwidth']) ? $settings['bandwidth'] : 10240;
         }
 
@@ -229,7 +235,11 @@ class Virtualmin extends Server
         if (!empty($settings['plan'])) {
             $params['plan'] = $settings['plan'];
         } else {
-            $params['quota'] = !empty($settings['quota']) ? $settings['quota'] : 1024;
+            // Same rule applies here as in createServer(): quota and uquota
+            // must be sent together or Virtualmin rejects the request.
+            $quota = !empty($settings['quota']) ? $settings['quota'] : 1024;
+            $params['quota'] = $quota;
+            $params['uquota'] = $quota;
             $params['bandwidth'] = !empty($settings['bandwidth']) ? $settings['bandwidth'] : 10240;
         }
 
