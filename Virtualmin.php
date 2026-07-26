@@ -401,6 +401,14 @@ class Virtualmin extends Server
             $response = Http::withBasicAuth($config['username'], $config['password'])
                 ->withOptions([
                     'verify' => (bool) ($config['verify_ssl'] ?? true),
+                    // The Docker container has no IPv6 route out, and Guzzle's
+                    // curl handler can hang for the full timeout trying an
+                    // unreachable IPv6 address before falling back to IPv4
+                    // (unlike the curl CLI, which fails over almost instantly).
+                    // Forcing IPv4 resolution avoids that multi-second stall.
+                    'curl' => [
+                        CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+                    ],
                 ])
                 ->timeout(30)
                 ->get($url);
