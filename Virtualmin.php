@@ -154,11 +154,12 @@ class Virtualmin extends Server
         }
 
         $features = $this->normalizeFeatures($settings['features'] ?? null);
-        foreach ($features as $feature) {
-            $params[$feature] = 1;
-        }
+        // 'unix' (create the system user) and 'dir' (create the home directory)
+        // are required for the domain to actually be usable, regardless of
+        // which optional features are picked.
+        $flags = array_unique(array_merge(['unix', 'dir'], $features));
 
-        $response = $this->apiCall($params);
+        $response = $this->apiCall($params, $flags);
 
         if (($response['status'] ?? null) !== 'success') {
             throw new \Exception('Virtualmin: failed to create domain "' . $domain . '": ' . ($response['error'] ?? 'unknown error'));
@@ -362,7 +363,7 @@ class Virtualmin extends Server
      * Docs: https://webmin.com/docs/api/remote/ (Virtualmin uses the same
      * remote.cgi mechanism as Webmin, one parameter per create-domain.pl option).
      */
-    protected function apiCall(array $params): array
+    protected function apiCall(array $params, array $flags = []): array
     {
         $config = $this->config;
         $port = $config['port'] ?? 10000;
@@ -374,13 +375,25 @@ class Virtualmin extends Server
         $url = ((string) $port === '443') ? $host : $host . ':' . $port;
         $url .= '/virtual-server/remote.cgi';
 
+        // Virtualmin's remote.cgi mirrors the underlying command-line scripts,
+        // where boolean options (e.g. --dns, --mail, --web) are just present
+        // or absent — they don't take a "=1" value. Passing them as key=1
+        // makes Virtualmin choke with "Unknown parameter 1", so they're
+        // appended to the query string as bare flags instead.
+        $query = http_build_query($params);
+        foreach ($flags as $flag) {
+            $query .= '&' . rawurlencode($flag);
+        }
+
+        $url .= '?' . $query;
+
         try {
             $response = Http::withBasicAuth($config['username'], $config['password'])
                 ->withOptions([
                     'verify' => (bool) ($config['verify_ssl'] ?? true),
                 ])
                 ->timeout(30)
-                ->get($url, $params);
+                ->get($url);
         } catch (\Exception $e) {
             Log::error('Virtualmin API connection error: ' . $e->getMessage());
             throw new \Exception('Could not connect to Virtualmin: ' . $e->getMessage());
